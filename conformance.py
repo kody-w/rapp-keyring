@@ -354,6 +354,7 @@ def c10_round_trip():
     cases = {
         "single byte": b"\x00",
         "all 256 byte values": bytes(range(256)),
+        # rapp-keyring: allow  synthetic PEM fixture, not a real key
         "multi-line PEM": b"-----BEGIN PRIVATE KEY-----\nabc\ndef\n-----END PRIVATE KEY-----\n",
         "unicode": "pässwörd-中文-\U0001f510".encode("utf-8"),
         "4 KiB blob": os.urandom(4096),

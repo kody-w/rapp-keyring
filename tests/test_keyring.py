@@ -305,6 +305,25 @@ class TestCLI(TempHome):
         self.assertNotIn("A" * 60, proc.stdout.decode())
         self.assertIn("Azure", payload["findings"][0]["kind"])
 
+    def test_scan_pragma_suppresses_and_records_reason(self):
+        probe = os.path.join(self.home, "fixture.py")
+        with open(probe, "w") as fh:
+            fh.write("# rapp-keyring: allow test fixture, not a real key\n")
+            fh.write('KEY = "AccountKey=' + "A" * 60 + '=="\n')
+        proc = self.cli("scan", probe, "--json")
+        payload = json.loads(proc.stdout.decode())
+        self.assertEqual(payload["findings"], [])
+        self.assertEqual(len(payload["suppressed"]), 1)
+        self.assertIn("test fixture", payload["suppressed"][0]["reason"])
+        self.assertEqual(proc.returncode, 0)
+
+    def test_scan_no_pragma_flag_overrides_suppression(self):
+        probe = os.path.join(self.home, "fixture.py")
+        with open(probe, "w") as fh:
+            fh.write('KEY = "AccountKey=' + "A" * 60 + '==" # rapp-keyring: allow fixture\n')
+        self.assertEqual(self.cli("scan", probe).returncode, 0)
+        self.assertNotEqual(self.cli("scan", probe, "--no-pragma").returncode, 0)
+
     def test_scan_clean_file_exits_zero(self):
         probe = os.path.join(self.home, "clean.json")
         with open(probe, "w") as fh:

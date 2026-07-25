@@ -1391,38 +1391,67 @@ SECRET_PATTERNS = [
 ]
 
 
+# A scanner that cannot be silenced gets switched off entirely, so it needs a
+# way to say "this one is deliberate". The pragma must name a reason, which
+# keeps the suppression reviewable in a diff instead of invisible.
+ALLOW_PRAGMA = re.compile(r"rapp-keyring:\s*allow(?:\s+(?P<reason>\S.*?))?\s*$")
+
+
 def cmd_scan(args) -> int:
     """Find plaintext credentials sitting in well-known config files.
 
     Reports file, line, and what kind of secret it looks like — never the value.
     """
     targets = list(args.paths) if args.paths else [os.path.expanduser(p) for p in PLAINTEXT_HOTSPOTS]
-    findings = []
+    findings, suppressed = [], []
     for path in targets:
         path = os.path.expanduser(path)
         if not os.path.isfile(path):
             continue
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                previous = ""
                 for lineno, line in enumerate(fh, 1):
                     for pattern, label in SECRET_PATTERNS:
                         if pattern.search(line):
-                            findings.append({"file": path, "line": lineno, "kind": label})
+                            # Accept the pragma on the offending line or the one
+                            # above it — a long credential line is exactly where
+                            # a trailing comment is least readable.
+                            pragma = ALLOW_PRAGMA.search(line) or ALLOW_PRAGMA.search(previous)
+                            if pragma and not args.no_pragma:
+                                suppressed.append({
+                                    "file": path, "line": lineno, "kind": label,
+                                    "reason": (pragma.group("reason") or "").strip()
+                                             or "(no reason given)",
+                                })
+                            else:
+                                findings.append({"file": path, "line": lineno, "kind": label})
                             break
-        except OSError as exc:
-            if exc.errno not in (errno.EACCES, errno.EPERM):
+                    previous = line
+        except (OSError, UnicodeDecodeError) as exc:
+            if isinstance(exc, OSError) and exc.errno not in (errno.EACCES, errno.EPERM):
                 raise
     if args.json:
-        print(json.dumps({"findings": findings, "scanned": len(targets)}, indent=2))
+        print(json.dumps({
+            "findings": findings,
+            "suppressed": suppressed,
+            "scanned": len(targets),
+        }, indent=2))
         return 1 if findings else 0
     if not findings:
         print("scanned %d location(s) — no plaintext credentials found" % len(targets))
+        if suppressed:
+            print("(%d suppressed by an explicit `rapp-keyring: allow` pragma; "
+                  "re-run with --no-pragma to see them)" % len(suppressed))
         return 0
     print("Plaintext credentials found (values are not shown):")
     print()
     for finding in findings:
         print("  %s:%s  — %s" % (finding["file"], finding["line"], finding["kind"]))
     print()
+    if suppressed:
+        print("(%d further match(es) suppressed by an explicit pragma)" % len(suppressed))
+        print()
     print("%d finding(s). Migrate each one:" % len(findings))
     print("  1. rapp-keyring set <name> --stdin      # paste the value, hidden")
     print("  2. remove it from the file")
@@ -1648,6 +1677,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("scan", help="find plaintext credentials in well-known config files")
     p.add_argument("paths", nargs="*")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--no-pragma", action="store_true",
+                   help="ignore `rapp-keyring: allow` suppressions and report everything")
     p.set_defaults(func=cmd_scan)
 
     p = sub.add_parser("doctor", help="health and posture check")
@@ -1676,7 +1707,8 @@ def main(argv=None) -> int:
     if getattr(args, "command", None) and args.command and args.command[0] == "--":
         args.command = args.command[1:]
 
-    for attr in ("json", "i_know", "fast", "stdin", "generate", "yes", "force"):
+    for attr in ("json", "i_know", "fast", "stdin", "generate", "yes", "force",
+                 "no_pragma"):
         if not hasattr(args, attr):
             setattr(args, attr, False)
 
