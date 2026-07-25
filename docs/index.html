@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAPP Keyring — credentials for AI agents, without sight</title>
+<meta name="description" content="An on-device credential broker for AI agents. The agent gets to use a secret without ever getting to see it.">
+<style>
+  :root{
+    --bg:#0d1117; --panel:#141a22; --line:#232c38;
+    --ink:#e6edf3; --dim:#9aa7b4; --faint:#6b7885;
+    --accent:#4ea1ff; --good:#3fb950; --warn:#d29922; --bad:#f85149;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:16px/1.65 var(--sans);
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:820px;margin:0 auto;padding:0 24px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:.9em}
+
+  header{padding:88px 0 56px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;
+           text-transform:uppercase;color:var(--faint);margin-bottom:20px}
+  h1{font-size:clamp(34px,6vw,52px);line-height:1.1;margin:0 0 20px;letter-spacing:-.02em}
+  .lede{font-size:clamp(18px,2.6vw,21px);color:var(--dim);margin:0;max-width:60ch}
+  .lede strong{color:var(--ink);font-weight:600}
+
+  section{padding:56px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:13px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
+     color:var(--faint);margin:0 0 24px;font-weight:600}
+  h3{font-size:19px;margin:36px 0 12px;letter-spacing:-.01em}
+  p{margin:0 0 16px;color:var(--dim);max-width:66ch}
+  p strong{color:var(--ink);font-weight:600}
+
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+      padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13.5px;
+      line-height:1.7;margin:0 0 18px}
+  pre code{font-size:inherit}
+  .c-dim{color:var(--faint)}
+  .c-good{color:var(--good)}
+  .c-bad{color:var(--bad)}
+  .c-warn{color:var(--warn)}
+  .c-acc{color:var(--accent)}
+
+  .install{background:var(--panel);border:1px solid var(--accent);border-radius:8px;
+           padding:18px 20px;font-family:var(--mono);font-size:14px;overflow-x:auto;
+           display:flex;align-items:center;gap:14px}
+  .install span{color:var(--good)}
+
+  table{width:100%;border-collapse:collapse;margin:0 0 18px;font-size:14.5px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--faint);font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;
+     text-transform:uppercase;font-weight:600}
+  td{color:var(--dim)}
+  td strong{color:var(--ink)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px}
+  .card h4{margin:0 0 8px;font-size:15px}
+  .card p{margin:0;font-size:14px}
+
+  .checks{font-family:var(--mono);font-size:13px;line-height:2}
+  .checks div{display:flex;gap:12px;align-items:baseline}
+  .checks .id{color:var(--faint);min-width:34px}
+  .checks .txt{color:var(--dim)}
+
+  .note{border-left:2px solid var(--warn);padding:2px 0 2px 18px;margin:0 0 18px}
+  .note p{color:var(--dim);margin:0}
+
+  footer{padding:48px 0 72px;color:var(--faint);font-size:14px}
+  footer a{color:var(--dim)}
+  @media (max-width:560px){ header{padding:56px 0 40px} section{padding:40px 0} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">RAPP ecosystem</div>
+    <h1>RAPP Keyring</h1>
+    <p class="lede">An on-device credential broker for AI agents. The agent gets to
+      <strong>use</strong> a secret without ever getting to <strong>see</strong> it.</p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>The problem</h2>
+    <p>An AI agent on your machine needs real credentials — to deploy, to call an API,
+       to reach a database. Every ordinary way of giving it one is a leak.</p>
+    <table>
+      <tr><th>What people do</th><th>How it leaks</th></tr>
+      <tr><td><strong>Key in <code>settings.json</code> / <code>.env</code></strong></td>
+          <td>Settings sync uploads it. Screenshots catch it. It gets committed.</td></tr>
+      <tr><td><strong><code>export API_KEY=…</code></strong></td>
+          <td>Inherited by every child process, dumped by any <code>env</code> call.</td></tr>
+      <tr><td><strong>Let the agent read it</strong></td>
+          <td>The value enters the model's context — it leaves your machine, lands in a
+              transcript, and may be echoed into a file or a PR.</td></tr>
+    </table>
+    <p>That third row is the one with no traditional answer, and the one that matters
+       most now. A secret an agent has <strong>read</strong> is a secret you have
+       disclosed to a third party, whatever your intentions were.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Use without sight</h2>
+    <p>The primary interface is not “give me the secret.” It is
+       <strong>“run this command with the secret injected.”</strong></p>
+<pre><code><span class="c-dim">$</span> rapp-keyring run --grant azure/storage-key -- ./deploy.sh</code></pre>
+    <p>The value lands in the child's environment as <code>AZURE_STORAGE_KEY</code>.
+       It is never returned to the caller. And everything the child prints is scanned
+       on the way out, so it cannot escape into your terminal, your logs, or an
+       agent's context:</p>
+<pre><code><span class="c-dim">$</span> rapp-keyring run --grant azure/storage-key -- sh -c 'echo "key is $AZURE_STORAGE_KEY"'
+key is <span class="c-warn">«redacted:azure/storage-key»</span></code></pre>
+    <p>Masking covers re-encoded forms too — base64, hex, URL-encoded, JSON-escaped —
+       because a leak rarely arrives verbatim.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Install</h2>
+    <div class="install"><span>$</span><code>curl -fsSL https://kody-w.github.io/rapp-keyring/install.sh | bash</code></div>
+    <p style="margin-top:18px">One Python file. No <code>pip install</code>, no third-party
+       packages, no root, no system service, and no network access at runtime.
+       Python 3.8+.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Two verbs</h2>
+    <p>The difference between them is the whole design.</p>
+    <table>
+      <tr><th>Verb</th><th>Meaning</th><th>Safe for an agent?</th></tr>
+      <tr><td><code>run</code></td><td>inject into a child process; caller never sees the value</td>
+          <td class="c-good"><strong>yes</strong></td></tr>
+      <tr><td><code>get</code></td><td>return the plaintext to the caller</td>
+          <td class="c-bad"><strong>no</strong> — enters model context</td></tr>
+    </table>
+    <p>Out of the box, agents may <code>run</code> and may not <code>get</code>:</p>
+<pre><code><span class="c-dim">$</span> rapp-keyring get azure/storage-key --i-know
+<span class="c-bad">rapp-keyring: denied:</span> caller 'claude-code' has no 'get' grant matching 'azure/storage-key'
+
+This is the sighted-read path — it returns the secret in plaintext, which for
+an AI agent means the value enters the model context and leaves the machine.</code></pre>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Find what is already exposed</h2>
+<pre><code><span class="c-dim">$</span> rapp-keyring scan
+Plaintext credentials found (values are not shown):
+
+  ~/Library/Application Support/Code/User/settings.json:6  — Azure storage account key
+
+1 finding(s). Migrate each one:
+  1. rapp-keyring set &lt;name&gt; --stdin
+  2. remove it from the file
+  3. rapp-keyring run --grant &lt;name&gt; -- &lt;the program that needed it&gt;
+  4. rotate the credential at its source — assume it already leaked</code></pre>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Tamper-evident audit</h2>
+    <p>Every action appends to a hash-chained log. Each record carries the digest of
+       the one before it, so modification, deletion, and forged appends all break the
+       chain at a detectable point. Values never appear — only names, sizes, and
+       truncated fingerprints.</p>
+<pre><code><span class="c-dim">$</span> rapp-keyring audit tail -n 3
+2026-07-25T19:51:02Z  seq=15  <span class="c-good">allow</span>  run   claude-code  azure/storage-key
+2026-07-25T19:52:41Z  seq=16  <span class="c-bad">deny</span>   get   claude-code  azure/storage-key
+2026-07-25T19:53:10Z  seq=17  <span class="c-good">allow</span>  get   shell        azure/storage-key <span class="c-warn">SIGHTED</span>
+
+<span class="c-dim">$</span> rapp-keyring audit verify
+<span class="c-good">OK</span> — chain intact (17 record(s))</code></pre>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Verify the claims yourself</h2>
+    <p>The conformance gate does not accept inspection as evidence. C1 runs the CLI
+       with <code>socket()</code> booby-trapped. C2 takes hundreds of thousands of
+       <code>ps</code> snapshots <em>during</em> a write and fails if the secret ever
+       appears in any process's arguments. C7 splits a secret at every possible byte
+       boundary.</p>
+<pre class="checks"><div><span class="c-good">PASS</span><span class="id">C1</span><span class="txt">The program opens no network connections.</span></div><div><span class="c-good">PASS</span><span class="id">C2</span><span class="txt">Secret values are never passed as command-line arguments.</span></div><div><span class="c-good">PASS</span><span class="id">C3</span><span class="txt">Policy denies by default; unknown callers get nothing.</span></div><div><span class="c-good">PASS</span><span class="id">C4</span><span class="txt">No AI agent may read a secret in plaintext by default.</span></div><div><span class="c-good">PASS</span><span class="id">C5</span><span class="txt">A sighted read requires an explicit acknowledgement.</span></div><div><span class="c-good">PASS</span><span class="id">C6</span><span class="txt">An injected secret cannot escape through the child's output.</span></div><div><span class="c-good">PASS</span><span class="id">C7</span><span class="txt">Redaction holds when a secret is split across reads.</span></div><div><span class="c-good">PASS</span><span class="id">C8</span><span class="txt">The audit log is tamper-evident.</span></div><div><span class="c-good">PASS</span><span class="id">C9</span><span class="txt">Secret values never appear in the audit log or in `list`.</span></div><div><span class="c-good">PASS</span><span class="id">C10</span><span class="txt">Any secret shape round-trips: binary, multi-line, unicode, large.</span></div><div><span class="c-good">PASS</span><span class="id">C11</span><span class="txt">State files are readable only by their owner.</span></div><div><span class="c-good">PASS</span><span class="id">C12</span><span class="txt">The build reports a version and a spec level.</span></div></pre>
+<pre><code><span class="c-dim">$</span> python3 conformance.py
+<span class="c-good">12 passed, 0 failed, 0 skipped</span></code></pre>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What this does not stop</h2>
+    <div class="note">
+      <p>A control trusted beyond its boundary is worse than no control. These limits
+         are in <a href="https://github.com/kody-w/rapp-keyring/blob/main/SECURITY.md">SECURITY.md</a>,
+         stated as plainly as the guarantees.</p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h4>Caller identity is advisory</h4>
+        <p>Derived from process ancestry. Anything running as your user can claim to be
+           anything. Policy makes over-reach visible and auditable — it is not a
+           boundary against a hostile local process.</p>
+      </div>
+      <div class="card">
+        <h4>A granted secret is a used secret</h4>
+        <p><code>run</code> hands the value to the child. That is the point. A malicious
+           child can exfiltrate it by means other than stdout.</p>
+      </div>
+      <div class="card">
+        <h4>Local root, and you, win</h4>
+        <p>Anyone running as your user can query the OS credential store directly. This
+           raises the floor on accidents and disclosure-by-context. It does not defeat
+           an attacker who already holds your account.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p style="color:var(--faint)">
+      <a href="https://github.com/kody-w/rapp-keyring">Source</a> ·
+      <a href="https://github.com/kody-w/rapp-keyring/blob/main/SECURITY.md">Security model</a> ·
+      <a href="https://github.com/kody-w/rapp-light">RAPP Light</a> ·
+      MIT licensed
+    </p>
+    <p style="color:var(--faint);max-width:62ch">
+      RAPP Keyring governs what an agent may <em>hold</em>. RAPP Light governs what an
+      agent may <em>do</em>. Together they are the credential and capability layers of
+      the RAPP ecosystem.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

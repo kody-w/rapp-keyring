@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "default": "deny",
+  "_comment": [
+    "A strict posture: no caller may ever read plaintext, including you.",
+    "Every credential use goes through `run`. Recovery is by rotation at the",
+    "source, not by reading the stored value back out."
+  ],
+  "callers": {
+    "shell":       { "run": ["*"], "get": [] },
+    "claude-code": { "run": ["dev/*", "azure/*"], "get": [], "deny": ["prod/*"] },
+    "copilot-cli": { "run": ["dev/*"], "get": [], "deny": ["prod/*"] },
+    "brainstem":   { "run": ["agent/*"], "get": [] },
+    "*":           { "run": [], "get": [] }
+  }
+}

@@ -1,0 +1,49 @@
+name: conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        python: ["3.9", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install age (portable backend)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y age
+
+      - name: Unit and integration tests
+        run: python3 tests/test_keyring.py -v
+
+      - name: Conformance gate
+        run: python3 conformance.py
+
+      - name: Conformance report (JSON artifact)
+        if: always()
+        run: python3 conformance.py --json > conformance-${{ matrix.os }}-py${{ matrix.python }}.json || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-${{ matrix.os }}-py${{ matrix.python }}
+          path: conformance-*.json
+
+  no-secrets-committed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The repo must not contain credentials
+        run: |
+          python3 rapp_keyring.py scan $(git ls-files) && echo "clean"
