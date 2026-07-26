@@ -237,8 +237,10 @@ brainstem, and CI.
 
 ---
 
-## License and marks
+## License
 
-Code: **MIT** — see [LICENSE](LICENSE). Fork it freely.
+MIT — see [LICENSE](LICENSE).
 
-Names: **RAPP Keyring**™ is a compound `rapp-*` mark of **Wildhaven Homes LLC**, claimed at common law. The MIT license grants no rights to the marks. "RAPP" standing alone and the RAPP Brainstem are deliberately **not** claimed — the stem is open. Integration is the license: if you genuinely integrate, you may say so. See [TRADEMARK.md](TRADEMARK.md) and the [canonical record](https://kody-w.github.io/rapp-train/TRADEMARKS.md).
+---
+
+<sub>RAPP Keyring is a trademark of Wildhaven Homes LLC. Code is MIT licensed; the license does not grant rights to the name. [Trademark notice](TRADEMARK.md)</sub>
