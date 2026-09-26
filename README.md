@@ -1,5 +1,9 @@
 # RAPP Keyring
 
+<!-- rapp1:network-header:start -->
+[![RAPP/1](https://kody-w.github.io/rapp-hive-public/portfolio/badges/rapp-keyring.svg)](https://github.com/kody-w/rapp-hive-public/blob/main/portfolio/repos/rapp-keyring.md) · **New to RAPP?** [Start here: get your Brainstem →](https://github.com/kody-w/rapp-installer#start-here)
+<!-- rapp1:network-header:end -->
+
 > An on-device credential broker for AI agents. The agent gets to **use** a
 > secret without ever getting to **see** it.
 
